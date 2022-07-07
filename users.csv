@@ -1,0 +1,3 @@
+username,password,description,is_admin
+foo,,admin user,yes
+bar,,general user,
