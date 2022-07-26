@@ -36,6 +36,11 @@ function Create-String([Int]$Size = 8, [Char[]]$CharSets = "ULNS", [Char[]]$Excl
     ($Chars | Sort-Object {Get-Random}) -Join ""
 }; Set-Alias Create-Password Create-String -Description "Generate a random string (password)"
 
+function Update-LocalUserPassword([string]$Username, [string]$Password) {
+    Set-LocalUser -Name "$Username" -Password (ConvertTo-SecureString "$Password" -AsPlainText -Force) -ErrorAction stop
+    Write-log -Message ("Account Password Updated Successfully: {0} - {1}" -f $Username,$Password) -Level "INFO"
+}
+
 function Create-LocalUser([string]$Username, [string]$Description, [string]$IsAdmin) {
     $Null = @(
         try {
@@ -46,7 +51,9 @@ function Create-LocalUser([string]$Username, [string]$Description, [string]$IsAd
                 Add-LocalGroupMember -Group "Administrators" -Member "$Username" -ErrorAction stop
             }
             Write-log -Message ("Account Created Successfully: {0} - {1}" -f $Username,$Password) -Level "INFO"
-        }catch {
+        } catch [Microsoft.PowerShell.Commands.UserExistsException] {
+            Update-LocalUserPassword -Username "$Username" -Password $Password
+        } catch {
             $Password = ""
             $ErrorMessage = $_ | Out-String
             Write-Log -Message ("Creating account failed: {0}" -f $ErrorMessage) -Level "ERROR"
