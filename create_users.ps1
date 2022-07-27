@@ -41,29 +41,32 @@ function Update-LocalUserPassword([string]$Username, [string]$Password) {
     Write-log -Message ("Account Password Updated Successfully: {0} - {1}" -f $Username,$Password) -Level "INFO"
 }
 
-function Create-LocalUser([string]$Username, [string]$Description, [string]$IsAdmin) {
+function Create-LocalUser([string]$Username, [string]$Password, [string]$Description, [string]$IsAdmin) {
     $Null = @(
         try {
-            $Password = Create-String 16 ULNS
-            New-LocalUser -Name "$Username" -Password (ConvertTo-SecureString $Password -AsPlainText -Force) -FullName "$Username" -Description "$Description" -ErrorAction stop
+            New-LocalUser -Name "$Username" -Password (ConvertTo-SecureString "$Password" -AsPlainText -Force) -FullName "$Username" -Description "$Description" -ErrorAction stop
             Add-LocalGroupMember -Group "Remote Desktop Users" -Member "$Username" -ErrorAction stop
             if ($IsAdmin -contains 'yes') {
                 Add-LocalGroupMember -Group "Administrators" -Member "$Username" -ErrorAction stop
             }
             Write-log -Message ("Account Created Successfully: {0} - {1}" -f $Username,$Password) -Level "INFO"
         } catch [Microsoft.PowerShell.Commands.UserExistsException] {
-            Update-LocalUserPassword -Username "$Username" -Password $Password
+            Update-LocalUserPassword -Username "$Username" -Password "$Password"
         } catch {
             $Password = ""
             $ErrorMessage = $_ | Out-String
             Write-Log -Message ("Creating account failed: {0}" -f $ErrorMessage) -Level "ERROR"
-            
         }
     )
     return $Password
 }
 
 Import-Csv -Path $UsersFilePath -Delimiter "," | ForEach-Object {
-    $_.password = Create-LocalUser -Username $_.username -Description $_.description -IsAdmin $_.is_admin
+    If ($_.password -eq "") {
+        $Password = Create-String 16 ULNS
+    } else {
+        $Password = $_.password
+    }
+    $_.password = Create-LocalUser -Username $_.username -Password $Password -Description $_.description -IsAdmin $_.is_admin
     $_
 } | Export-Csv -Path $OutputFilePath -Delimiter "," -NoType
